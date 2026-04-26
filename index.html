@@ -516,6 +516,55 @@
                     }
                 }
             });
+
+            /* --- Chart 3: Activity by Residents --- */
+            const residentLabels = Object.keys(stats.residents);
+            const residentAssembly = residentLabels.map(r => stats.residents[r].assembly);
+            const residentValues = residentLabels.map(r => stats.residents[r].values);
+            
+            const residentCtx = document.getElementById('residentChart').getContext('2d');
+            if (residentChartInstance) residentChartInstance.destroy();
+            residentChartInstance = new Chart(residentCtx, {
+                type: 'bar',
+                data: {
+                    labels: residentLabels.length > 0 ? residentLabels : ['No data'],
+                    datasets: [
+                        { label: 'Assemblies', data: residentAssembly, backgroundColor: '#3b82f6', borderRadius: 4 },
+                        { label: 'Values', data: residentValues, backgroundColor: '#10b981', borderRadius: 4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: {display: false} }, y: { stacked: true, border: {display: false} } }, plugins: { legend: { position: 'top', labels: {usePointStyle: true, boxWidth: 8} } } }
+            });
+
+            /* --- Chart 4: Activity by Principals --- */
+            const principalLabels = Object.keys(stats.principals);
+            const principalVisits = principalLabels.map(p => stats.principals[p].visits);
+
+            const principalCtx = document.getElementById('principalChart').getContext('2d');
+            if (principalChartInstance) principalChartInstance.destroy();
+            principalChartInstance = new Chart(principalCtx, {
+                type: 'bar',
+                data: {
+                    labels: principalLabels.length > 0 ? principalLabels : ['No data'],
+                    datasets: [{ label: 'Visits', data: principalVisits, backgroundColor: '#8b5cf6', borderRadius: 4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: {display: false} }, y: { border: {display: false} } }, plugins: { legend: { position: 'top', labels: {usePointStyle: true, boxWidth: 8} } } }
+            });
+
+            /* --- Chart 5: Activity by Priests --- */
+            const priestLabels = Object.keys(stats.priests);
+            const priestFollowUps = priestLabels.map(p => stats.priests[p].followUp);
+
+            const priestCtx = document.getElementById('priestChart').getContext('2d');
+            if (priestChartInstance) priestChartInstance.destroy();
+            priestChartInstance = new Chart(priestCtx, {
+                type: 'bar',
+                data: {
+                    labels: priestLabels.length > 0 ? priestLabels : ['No data'],
+                    datasets: [{ label: 'Follow-Ups', data: priestFollowUps, backgroundColor: '#f59e0b', borderRadius: 4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: {display: false} }, y: { border: {display: false} } }, plugins: { legend: { position: 'top', labels: {usePointStyle: true, boxWidth: 8} } } }
+            });
         }
 
         // Run on load
