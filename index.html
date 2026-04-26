@@ -3,573 +3,502 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>School Activity Logs Dashboard</title>
+    <title>Flame Function Dashboard</title>
     
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: {
-                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 900: '#0c4a6e' }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- External Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- PapaParse for parsing CSV from Google Sheets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <style>
-        body { background-color: #f8fafc; }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(226, 232, 240, 0.8);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Tailwind gray-100 */
         }
+        .chart-container {
+            position: relative;
+            height: 350px; /* Increased slightly to accommodate larger legends */
+            width: 100%;
+        }
+        /* Loading Spinner */
         .loader {
-            border: 3px solid #f3f3f3;
+            border: 5px solid #e5e7eb;
+            border-top: 5px solid #3b82f6;
             border-radius: 50%;
-            border-top: 3px solid #0284c7;
-            width: 24px;
-            height: 24px;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
-<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+<body class="flex flex-col min-h-screen text-slate-800">
 
-    <!-- Navbar -->
-    <nav class="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 items-center">
-                <div class="flex items-center space-x-3">
-                    <div class="bg-brand-100 p-2 rounded-lg">
-                        <i data-lucide="layout-dashboard" class="w-6 h-6 text-brand-600"></i>
-                    </div>
-                    <span class="font-semibold text-xl tracking-tight text-slate-900">Schools Admin Dashboard</span>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <span id="last-updated" class="text-sm text-slate-500 hidden sm:inline-block"></span>
-                    <button onclick="initDashboard()" class="flex items-center space-x-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1">
-                        <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i>
-                        <span>Refresh Data</span>
-                    </button>
-                </div>
+    <!-- Header Section -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 id="dashboard-title" class="text-2xl md:text-3xl font-bold text-center sm:text-left text-slate-800 transition-opacity duration-500 opacity-0">
+                    Loading Dashboard...
+                </h1>
+                <p class="text-center sm:text-left text-slate-500 mt-2 text-sm">Real-time statistics from Flame Function Logs</p>
             </div>
+            <button id="refresh-btn" class="hidden bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg inline-flex items-center transition shadow-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Refresh Data
+            </button>
         </div>
-    </nav>
+    </header>
 
     <!-- Main Content -->
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         
-        <!-- Error Banner -->
-        <div id="error-banner" class="hidden mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <i data-lucide="alert-circle" class="h-5 w-5 text-red-500"></i>
-                </div>
-                <div class="ml-3">
-                    <p class="text-sm text-red-700" id="error-message">Error loading data. Please ensure the Google Sheets sharing settings are set to "Anyone with the link can view".</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Empty State Banner -->
-        <div id="empty-banner" class="hidden mb-6 bg-blue-50 border border-blue-200 p-4 rounded-lg flex items-start space-x-3">
-            <i data-lucide="info" class="w-5 h-5 text-blue-500 mt-0.5"></i>
-            <div>
-                <h3 class="text-sm font-medium text-blue-800">No data found in the sheets</h3>
-                <p class="text-sm text-blue-600 mt-1">The dashboard is connected successfully, but the sheets appear to be empty. Add some rows to your Google Sheets to see the statistics!</p>
-            </div>
-        </div>
-
-        <!-- Loading Overlay -->
+        <!-- Loading State -->
         <div id="loading-state" class="flex flex-col items-center justify-center py-20">
             <div class="loader mb-4"></div>
-            <p class="text-slate-500 font-medium">Fetching live data from Google Sheets...</p>
+            <p class="text-slate-600 font-medium">Fetching live data from Google Sheets...</p>
         </div>
 
-        <!-- Dashboard Content (Hidden initially) -->
-        <div id="dashboard-content" class="hidden space-y-6">
+        <!-- Summary Statistics (Hidden initially) -->
+        <div id="summary-stats" class="hidden grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            <div class="bg-blue-50 rounded-xl p-4 border border-blue-100 text-center shadow-sm">
+                <p class="text-xs md:text-sm text-blue-600 font-bold uppercase tracking-wider">Total Activities</p>
+                <p id="stat-total" class="text-3xl md:text-4xl font-bold text-blue-800 mt-2">-</p>
+            </div>
+            <div class="bg-emerald-50 rounded-xl p-4 border border-emerald-100 text-center shadow-sm">
+                <p class="text-xs md:text-sm text-emerald-600 font-bold uppercase tracking-wider">Resident Tasks</p>
+                <p id="stat-resident" class="text-3xl md:text-4xl font-bold text-emerald-800 mt-2">-</p>
+            </div>
+            <div class="bg-amber-50 rounded-xl p-4 border border-amber-100 text-center shadow-sm">
+                <p class="text-xs md:text-sm text-amber-600 font-bold uppercase tracking-wider">Principal Visits</p>
+                <p id="stat-principal" class="text-3xl md:text-4xl font-bold text-amber-800 mt-2">-</p>
+            </div>
+            <div class="bg-purple-50 rounded-xl p-4 border border-purple-100 text-center shadow-sm">
+                <p class="text-xs md:text-sm text-purple-600 font-bold uppercase tracking-wider">Priest Follow-ups</p>
+                <p id="stat-priest" class="text-3xl md:text-4xl font-bold text-purple-800 mt-2">-</p>
+            </div>
+            <div class="bg-teal-50 rounded-xl p-4 border border-teal-100 text-center shadow-sm">
+                <p class="text-xs md:text-sm text-teal-600 font-bold uppercase tracking-wider">Completed (Yes)</p>
+                <p id="stat-done-yes" class="text-3xl md:text-4xl font-bold text-teal-800 mt-2">-</p>
+            </div>
+            <div class="bg-rose-50 rounded-xl p-4 border border-rose-100 text-center shadow-sm">
+                <p class="text-xs md:text-sm text-rose-600 font-bold uppercase tracking-wider">Pending (No)</p>
+                <p id="stat-done-no" class="text-3xl md:text-4xl font-bold text-rose-800 mt-2">-</p>
+            </div>
+        </div>
+
+        <!-- Dashboard Grid (Hidden initially) -->
+        <div id="dashboard-grid" class="hidden grid grid-cols-1 md:grid-cols-2 gap-8">
             
-            <!-- KPI Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                
-                <!-- Assembly Card -->
-                <div class="glass-card rounded-xl p-6 transition-all hover:shadow-md">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-sm font-medium text-slate-500 mb-1">Morning Assemblies</p>
-                            <h3 class="text-3xl font-bold text-slate-800" id="kpi-assembly-total">0</h3>
-                        </div>
-                        <div class="bg-blue-100 p-2.5 rounded-lg text-blue-600">
-                            <i data-lucide="sun" class="w-5 h-5"></i>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex items-center text-sm">
-                        <span class="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded" id="kpi-assembly-done">0 Done</span>
-                        <span class="text-slate-400 ml-2" id="kpi-assembly-rate">(0%)</span>
-                    </div>
+            <!-- Overall Completion Status -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 transition hover:shadow-md">
+                <h2 class="text-lg font-semibold mb-4 text-slate-700 border-b pb-2">Overall Completion Status</h2>
+                <div class="chart-container">
+                    <canvas id="completionChart"></canvas>
                 </div>
-
-                <!-- Values Card -->
-                <div class="glass-card rounded-xl p-6 transition-all hover:shadow-md">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-sm font-medium text-slate-500 mb-1">Values Classes</p>
-                            <h3 class="text-3xl font-bold text-slate-800" id="kpi-values-total">0</h3>
-                        </div>
-                        <div class="bg-emerald-100 p-2.5 rounded-lg text-emerald-600">
-                            <i data-lucide="book-open" class="w-5 h-5"></i>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex items-center text-sm">
-                        <span class="font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded" id="kpi-values-done">0 Done</span>
-                        <span class="text-slate-400 ml-2" id="kpi-values-rate">(0%)</span>
-                    </div>
-                </div>
-
-                <!-- Visits Card -->
-                <div class="glass-card rounded-xl p-6 transition-all hover:shadow-md">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-sm font-medium text-slate-500 mb-1">Principals' Visits</p>
-                            <h3 class="text-3xl font-bold text-slate-800" id="kpi-visits-total">0</h3>
-                        </div>
-                        <div class="bg-purple-100 p-2.5 rounded-lg text-purple-600">
-                            <i data-lucide="users" class="w-5 h-5"></i>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex items-center text-sm">
-                        <span class="font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded" id="kpi-visits-done">0 Done</span>
-                        <span class="text-slate-400 ml-2" id="kpi-visits-rate">(0%)</span>
-                    </div>
-                </div>
-
-                <!-- Follow-up Card -->
-                <div class="glass-card rounded-xl p-6 transition-all hover:shadow-md">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-sm font-medium text-slate-500 mb-1">Follow-Ups</p>
-                            <h3 class="text-3xl font-bold text-slate-800" id="kpi-followup-total">0</h3>
-                        </div>
-                        <div class="bg-amber-100 p-2.5 rounded-lg text-amber-600">
-                            <i data-lucide="clipboard-check" class="w-5 h-5"></i>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex items-center text-sm">
-                        <span class="font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded" id="kpi-followup-done">0 Done</span>
-                        <span class="text-slate-400 ml-2" id="kpi-followup-rate">(0%)</span>
-                    </div>
-                </div>
-
             </div>
 
-            <!-- Charts Section -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                <!-- School Distribution (Spans 2 columns) -->
-                <div class="glass-card rounded-xl p-6 lg:col-span-2">
-                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Activity by School</h3>
-                    <div class="relative h-72 w-full">
-                        <canvas id="schoolChart"></canvas>
-                    </div>
+            <!-- Activity by School -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 transition hover:shadow-md">
+                <h2 class="text-lg font-semibold mb-4 text-slate-700 border-b pb-2">Activity by School</h2>
+                <div class="chart-container">
+                    <canvas id="schoolChart"></canvas>
                 </div>
-
-                <!-- Overall Completion -->
-                <div class="glass-card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Overall Task Completion</h3>
-                    <div class="relative h-64 w-full flex justify-center">
-                        <canvas id="completionChart"></canvas>
-                    </div>
-                    <div class="mt-4 text-center">
-                        <p class="text-sm text-slate-500">Across all log categories</p>
-                    </div>
-                </div>
-
             </div>
-            
-            <!-- Summary Table / Notes Preview -->
-            <div class="glass-card rounded-xl p-6">
-                 <h3 class="text-lg font-semibold text-slate-800 mb-4">Log Categories Overview</h3>
-                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200">
-                        <thead>
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Log Type</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Total Recorded</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Completed</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Pending</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100" id="summary-table-body">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                 </div>
+
+            <!-- Activity by Residents -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 transition hover:shadow-md">
+                <h2 class="text-lg font-semibold mb-4 text-slate-700 border-b pb-2">Activity by Residents</h2>
+                <div class="chart-container">
+                    <canvas id="residentChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Activity by Principals -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 transition hover:shadow-md">
+                <h2 class="text-lg font-semibold mb-4 text-slate-700 border-b pb-2">Activity by Principals</h2>
+                <div class="chart-container">
+                    <canvas id="principalChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Activity by Priests -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 transition hover:shadow-md">
+                <h2 class="text-lg font-semibold mb-4 text-slate-700 border-b pb-2">Activity by Priests</h2>
+                <div class="chart-container">
+                    <canvas id="priestChart"></canvas>
+                </div>
             </div>
 
         </div>
     </main>
 
-    <footer class="border-t border-slate-200 bg-white mt-auto py-6 text-center">
-        <p class="text-sm text-slate-500">Connected live to Google Sheets securely via visualization API.</p>
+    <!-- Footer Section -->
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <p class="text-center text-slate-600 font-medium">By: Michael Edward</p>
+        </div>
     </footer>
 
+    <!-- Logic Script -->
     <script>
-        // Initialize Icons
-        lucide.createIcons();
-
-        // Google Sheets IDs
-        const SHEET_IDS = {
-            assembly: '1_8NFFagOKiwZjN0wGN11Ssyng6uPlyGYb2JAjoQjOhk',
-            values: '1TGkrp1VULQbaFY4kbIyR6Yk0bKkUKF2mMnc0tqrsbEQ',
-            visits: '1e2HkSb-3eKDX0eI61ZY74eL5MOBhFGQ_1W5a-4owDYc',
-            followUp: '1acp140wgx-5i_WtY_7NIXLhLEGAM9xYg9VHtpHT9g-M'
+        // Google Sheets CSV Export URLs
+        const sheetUrls = {
+            morningAssembly: 'https://docs.google.com/spreadsheets/d/1_8NFFagOKiwZjN0wGN11Ssyng6uPlyGYb2JAjoQjOhk/export?format=csv',
+            valuesLog: 'https://docs.google.com/spreadsheets/d/1TGkrp1VULQbaFY4kbIyR6Yk0bKkUKF2mMnc0tqrsbEQ/export?format=csv',
+            principalsVisit: 'https://docs.google.com/spreadsheets/d/1e2HkSb-3eKDX0eI61ZY74eL5MOBhFGQ_1W5a-4owDYc/export?format=csv',
+            followUp: 'https://docs.google.com/spreadsheets/d/1acp140wgx-5i_WtY_7NIXLhLEGAM9xYg9VHtpHT9g-M/export?format=csv'
         };
 
-        // Chart Instances
-        let schoolChartInstance = null;
-        let completionChartInstance = null;
+        // Standardized beautiful colors for charts
+        const chartColors = [
+            '#3b82f6', // blue-500
+            '#10b981', // emerald-500
+            '#f59e0b', // amber-500
+            '#ef4444', // red-500
+            '#8b5cf6', // violet-500
+            '#ec4899', // pink-500
+            '#14b8a6', // teal-500
+            '#f97316'  // orange-500
+        ];
 
-        // Helper: Format Google Sheet CSV URL
-        const getCsvUrl = (id) => `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
+        // Store chart instances to destroy them on refresh to avoid overlapping bugs
+        let chartInstances = {};
 
-        // Helper: Check if a task is "Done"
-        const isDone = (val) => {
-            if (!val) return false;
-            const str = String(val).toLowerCase().trim();
-            return ['yes', 'true', '1', 'done', 'completed', 'y'].includes(str);
-        };
-
-        // Helper: Fetch and Parse CSV
-        const fetchSheetData = async (id) => {
-            try {
-                const response = await fetch(getCsvUrl(id));
-                if (!response.ok) throw new Error('Network response was not ok');
-                const csvText = await response.text();
-                
-                return new Promise((resolve) => {
-                    Papa.parse(csvText, {
-                        header: true,
-                        skipEmptyLines: true,
-                        complete: (results) => {
-                            // Filter out completely empty rows that might be parsed
-                            const cleaned = results.data.filter(row => Object.values(row).some(val => val !== ""));
-                            resolve(cleaned);
-                        },
-                        error: () => resolve([]) // Return empty array on parse error
-                    });
+        // Function to fetch and parse CSV from a URL
+        async function fetchCSV(url) {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const csvText = await response.text();
+            
+            return new Promise((resolve, reject) => {
+                Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => resolve(results.data),
+                    error: (error) => reject(error)
                 });
-            } catch (error) {
-                console.error(`Error fetching sheet ${id}:`, error);
-                throw error;
-            }
-        };
+            });
+        }
 
-        // Main logic to load and render data
-        async function initDashboard() {
-            // UI States
-            document.getElementById('loading-state').classList.remove('hidden');
-            document.getElementById('dashboard-content').classList.add('hidden');
-            document.getElementById('error-banner').classList.add('hidden');
-            document.getElementById('empty-banner').classList.add('hidden');
-            document.getElementById('refresh-icon').classList.add('animate-spin');
-
+        // Main initialization function
+        async function initializeDashboard() {
             try {
-                // Fetch all sheets concurrently
-                const [assemblyData, valuesData, visitsData, followUpData] = await Promise.all([
-                    fetchSheetData(SHEET_IDS.assembly),
-                    fetchSheetData(SHEET_IDS.values),
-                    fetchSheetData(SHEET_IDS.visits),
-                    fetchSheetData(SHEET_IDS.followUp)
+                // Fetch all data concurrently
+                const [morningData, valuesData, principalsData, followUpData] = await Promise.all([
+                    fetchCSV(sheetUrls.morningAssembly),
+                    fetchCSV(sheetUrls.valuesLog),
+                    fetchCSV(sheetUrls.principalsVisit),
+                    fetchCSV(sheetUrls.followUp)
                 ]);
 
-                const dataSets = {
-                    assembly: { label: 'Assemblies', data: assemblyData },
-                    values: { label: 'Values Classes', data: valuesData },
-                    visits: { label: 'Principals Visits', data: visitsData },
-                    followUp: { label: 'Follow-Ups', data: followUpData }
+                // Aggregate Data Containers
+                let allDates = [];
+                let schoolCounts = {};
+                let residentCounts = {};
+                let principalCounts = {};
+                let priestCounts = {};
+                let doneCounts = { 'Yes': 0, 'No': 0 };
+
+                // New containers for stacked chart
+                let schoolTaskCounts = {};
+                let uniqueTasks = new Set();
+
+                // Helper to process common fields exactly once per row to avoid double counting
+                const processRowCore = (row, schoolName, taskName) => {
+                    if (schoolName) {
+                        schoolCounts[schoolName] = (schoolCounts[schoolName] || 0) + 1;
+                        if (taskName) {
+                            if (!schoolTaskCounts[schoolName]) schoolTaskCounts[schoolName] = {};
+                            schoolTaskCounts[schoolName][taskName] = (schoolTaskCounts[schoolName][taskName] || 0) + 1;
+                            uniqueTasks.add(taskName);
+                        }
+                    }
+                    if (row['Done']) {
+                        const doneVal = row['Done'].trim();
+                        if (doneVal === 'Yes' || doneVal === 'No') {
+                            doneCounts[doneVal] = (doneCounts[doneVal] || 0) + 1;
+                        }
+                    }
+                    if (row['Date']) {
+                        const dateObj = new Date(row['Date'].trim());
+                        if (!isNaN(dateObj)) allDates.push(dateObj);
+                    }
                 };
 
-                // Check if totally empty
-                const totalRecords = assemblyData.length + valuesData.length + visitsData.length + followUpData.length;
-                if (totalRecords === 0) {
-                    document.getElementById('empty-banner').classList.remove('hidden');
+                // Helper for simple entity counts
+                const countEntity = (row, fieldName, targetObject) => {
+                    const val = row[fieldName] ? row[fieldName].trim() : null;
+                    if (val) targetObject[val] = (targetObject[val] || 0) + 1;
+                };
+
+                // Process Morning Assembly Data
+                morningData.forEach(row => {
+                    processRowCore(row, row['School Name']?.trim(), row['Task']?.trim());
+                    countEntity(row, 'Resident Name', residentCounts);
+                });
+
+                // Process Values Log Data (Using 'Value' as the task)
+                valuesData.forEach(row => {
+                    processRowCore(row, row['School Name']?.trim(), row['Value']?.trim());
+                    countEntity(row, 'Resident Name', residentCounts);
+                });
+
+                // Process Principals Data
+                principalsData.forEach(row => {
+                    processRowCore(row, row['School Name']?.trim(), row['Task']?.trim());
+                    countEntity(row, 'Principal Name', principalCounts);
+                });
+
+                // Process Follow Up Data
+                followUpData.forEach(row => {
+                    processRowCore(row, row['School Name']?.trim(), row['Follow-Up']?.trim());
+                    countEntity(row, 'Priest Name', priestCounts);
+                });
+
+                // Determine Min and Max Dates
+                let titleText = "Flame Function Dashboard";
+                if (allDates.length > 0) {
+                    const minDate = new Date(Math.min(...allDates));
+                    const maxDate = new Date(Math.max(...allDates));
+                    
+                    const formatOpts = { month: 'short', day: 'numeric', year: 'numeric' };
+                    const minStr = minDate.toLocaleDateString('en-US', formatOpts);
+                    const maxStr = maxDate.toLocaleDateString('en-US', formatOpts);
+                    
+                    titleText = `Flame Function Dashboard from ${minStr} to ${maxStr}`;
                 }
 
-                // Process and Render Data
-                const aggregatedData = processData(dataSets);
-                updateKPIs(aggregatedData);
-                renderCharts(aggregatedData);
-                renderTable(aggregatedData);
+                // Update UI elements
+                const titleElement = document.getElementById('dashboard-title');
+                titleElement.textContent = titleText;
+                titleElement.classList.remove('opacity-0');
+                
+                // Populate Summary Stats
+                const totalSchool = Object.values(schoolCounts).reduce((a, b) => a + b, 0);
+                const totalResident = Object.values(residentCounts).reduce((a, b) => a + b, 0);
+                const totalPrincipal = Object.values(principalCounts).reduce((a, b) => a + b, 0);
+                const totalPriest = Object.values(priestCounts).reduce((a, b) => a + b, 0);
 
-                // Update Timestamp
-                const now = new Date();
-                document.getElementById('last-updated').textContent = `Last updated: ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                document.getElementById('stat-total').textContent = totalSchool;
+                document.getElementById('stat-resident').textContent = totalResident;
+                document.getElementById('stat-principal').textContent = totalPrincipal;
+                document.getElementById('stat-priest').textContent = totalPriest;
+                document.getElementById('stat-done-yes').textContent = doneCounts['Yes'] || 0;
+                document.getElementById('stat-done-no').textContent = doneCounts['No'] || 0;
 
-                // Show Content
-                document.getElementById('loading-state').classList.add('hidden');
-                document.getElementById('dashboard-content').classList.remove('hidden');
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('summary-stats').classList.remove('hidden');
+                document.getElementById('dashboard-grid').classList.remove('hidden');
+                document.getElementById('refresh-btn').classList.remove('hidden');
+
+                // Render Charts
+                renderChart('completionChart', 'pie', doneCounts, 'Completion Status');
+                renderStackedBarChart('schoolChart', schoolCounts, schoolTaskCounts, uniqueTasks);
+                renderChart('residentChart', 'doughnut', residentCounts, 'Activities Guided');
+                renderChart('principalChart', 'pie', principalCounts, 'Visits Conducted');
+                renderChart('priestChart', 'bar', priestCounts, 'Follow-Ups Completed');
 
             } catch (error) {
-                document.getElementById('loading-state').classList.add('hidden');
-                document.getElementById('error-banner').classList.remove('hidden');
-            } finally {
-                document.getElementById('refresh-icon').classList.remove('animate-spin');
+                console.error("Error loading dashboard data:", error);
+                document.getElementById('loading-state').innerHTML = `
+                    <div class="text-red-500 flex flex-col items-center">
+                        <svg class="w-12 h-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <p class="font-medium text-lg">Error loading data.</p>
+                        <p class="text-sm text-slate-500 mt-2">Please ensure the Google Sheets links are publicly accessible.</p>
+                    </div>`;
             }
         }
 
-        // Process raw data into usable statistics
-        function processData(dataSets) {
-            const stats = {
-                assembly: { total: 0, done: 0 },
-                values: { total: 0, done: 0 },
-                visits: { total: 0, done: 0 },
-                followUp: { total: 0, done: 0 },
-                schools: {} // Format: { "School Name": { assembly: 0, values: 0, visits: 0, followUp: 0 } }
-            };
-
-            const processSet = (key, dataArray) => {
-                dataArray.forEach(row => {
-                    stats[key].total++;
-                    if (isDone(row.Done)) stats[key].done++;
-
-                    // Extract school name (handle slight header variations)
-                    const schoolName = row['School Name'] || row['School'] || 'Unknown School';
-                    if (schoolName && schoolName.trim() !== '') {
-                        const sName = schoolName.trim();
-                        if (!stats.schools[sName]) {
-                            stats.schools[sName] = { assembly: 0, values: 0, visits: 0, followUp: 0 };
-                        }
-                        stats.schools[sName][key]++;
-                    }
-                });
-            };
-
-            processSet('assembly', dataSets.assembly.data);
-            processSet('values', dataSets.values.data);
-            processSet('visits', dataSets.visits.data);
-            processSet('followUp', dataSets.followUp.data);
-
-            return stats;
-        }
-
-        // Update KPI Cards
-        function updateKPIs(stats) {
-            const updateCard = (key, data) => {
-                const total = data.total;
-                const done = data.done;
-                const rate = total > 0 ? Math.round((done / total) * 100) : 0;
-                
-                document.getElementById(`kpi-${key}-total`).textContent = total;
-                document.getElementById(`kpi-${key}-done`).textContent = `${done} Done`;
-                document.getElementById(`kpi-${key}-rate`).textContent = `(${rate}%)`;
-            };
-
-            updateCard('assembly', stats.assembly);
-            updateCard('values', stats.values);
-            updateCard('visits', stats.visits);
-            updateCard('followup', stats.followUp);
-        }
-
-        // Render Summary Table
-        function renderTable(stats) {
-            const tbody = document.getElementById('summary-table-body');
-            tbody.innerHTML = ''; // Clear
-
-            const rows = [
-                { name: 'Morning Assemblies', key: 'assembly', icon: 'sun', color: 'text-blue-500' },
-                { name: 'Values Classes', key: 'values', icon: 'book-open', color: 'text-emerald-500' },
-                { name: 'Principals Visits', key: 'visits', icon: 'users', color: 'text-purple-500' },
-                { name: 'Follow-Ups', key: 'followUp', icon: 'clipboard-check', color: 'text-amber-500' }
-            ];
-
-            rows.forEach(r => {
-                const data = stats[r.key];
-                const pending = data.total - data.done;
-                
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="px-4 py-4 whitespace-nowrap">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="${r.icon}" class="w-4 h-4 ${r.color}"></i>
-                            <span class="text-sm font-medium text-slate-900">${r.name}</span>
-                        </div>
-                    </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-sm text-slate-700 font-semibold">${data.total}</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-sm text-emerald-600">${data.done}</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-sm text-amber-600">${pending}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+        // Helper to convert object data into chart-ready format and render
+        function renderChart(canvasId, type, dataObj, labelText) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
             
-            // Re-render new dynamic icons
-            lucide.createIcons();
-        }
+            // Destroy existing chart instance if it exists before re-rendering
+            if (chartInstances[canvasId]) {
+                chartInstances[canvasId].destroy();
+            }
 
-        // Render Chart.js Graphs
-        function renderCharts(stats) {
-            // Setup Default Fonts
-            Chart.defaults.font.family = 'Inter, sans-serif';
-            Chart.defaults.color = '#64748b';
+            // Sort data by values descending for better visualization
+            const sortedKeys = Object.keys(dataObj).sort((a, b) => dataObj[b] - dataObj[a]);
+            const labels = sortedKeys;
+            const values = sortedKeys.map(key => dataObj[key]);
 
-            /* --- Chart 1: Overall Completion (Doughnut) --- */
-            const totalDone = stats.assembly.done + stats.values.done + stats.visits.done + stats.followUp.done;
-            const totalRecords = stats.assembly.total + stats.values.total + stats.visits.total + stats.followUp.total;
-            const totalPending = totalRecords - totalDone;
+            // Assign background colors dynamically
+            const bgColors = labels.map((_, i) => chartColors[i % chartColors.length] + 'CC'); // CC adds 80% opacity
+            const borderColors = labels.map((_, i) => chartColors[i % chartColors.length]);
 
-            const completionCtx = document.getElementById('completionChart').getContext('2d');
-            if (completionChartInstance) completionChartInstance.destroy();
-            
-            completionChartInstance = new Chart(completionCtx, {
-                type: 'doughnut',
+            chartInstances[canvasId] = new Chart(ctx, {
+                type: type,
                 data: {
-                    labels: ['Completed', 'Pending'],
+                    labels: labels,
                     datasets: [{
-                        data: [totalDone, totalPending],
-                        backgroundColor: ['#10b981', '#f59e0b'],
-                        borderWidth: 0,
-                        hoverOffset: 4
+                        label: labelText,
+                        data: values,
+                        backgroundColor: type === 'bar' ? chartColors[0] + 'CC' : bgColors,
+                        borderColor: type === 'bar' ? chartColors[0] : borderColors,
+                        borderWidth: 1,
+                        borderRadius: type === 'bar' ? 4 : 0
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '75%',
                     plugins: {
-                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } },
+                        legend: {
+                            display: type !== 'bar',
+                            position: 'right',
+                            labels: {
+                                font: { family: "'Inter', sans-serif" }
+                            }
+                        },
                         tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { family: "'Inter', sans-serif" },
+                            bodyFont: { family: "'Inter', sans-serif" },
+                            padding: 12,
+                            cornerRadius: 8,
                             callbacks: {
                                 label: function(context) {
-                                    let label = context.label || '';
-                                    if (label) label += ': ';
-                                    label += context.raw;
-                                    if (totalRecords > 0) {
-                                        const p = Math.round((context.raw / totalRecords) * 100);
-                                        label += ` (${p}%)`;
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
                                     }
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const value = context.raw;
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                                    label += `${value} (${percentage})`;
                                     return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: type === 'bar' ? {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0, font: { family: "'Inter', sans-serif" } }
+                        },
+                        x: {
+                            ticks: { font: { family: "'Inter', sans-serif" } },
+                            grid: { display: false }
+                        }
+                    } : {}
+                }
+            });
+        }
+
+        // Helper to render stacked bar chart for School Tasks
+        function renderStackedBarChart(canvasId, schoolTotals, schoolTaskBreakdown, taskSet) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            if (chartInstances[canvasId]) {
+                chartInstances[canvasId].destroy();
+            }
+
+            const labels = Object.keys(schoolTotals).sort((a, b) => schoolTotals[b] - schoolTotals[a]);
+            const tasks = Array.from(taskSet);
+
+            // Extended color palette to support many unique tasks
+            const extendedColors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
+                '#6366f1', '#84cc16', '#eab308', '#f43f5e', '#a855f7', '#d946ef', '#06b6d4', '#fdba74'
+            ];
+
+            const datasets = tasks.map((task, index) => {
+                const color = extendedColors[index % extendedColors.length];
+                return {
+                    label: task,
+                    data: labels.map(school => {
+                        return (schoolTaskBreakdown[school] && schoolTaskBreakdown[school][task]) ? schoolTaskBreakdown[school][task] : 0;
+                    }),
+                    backgroundColor: color + 'CC',
+                    borderColor: color,
+                    borderWidth: 1
+                };
+            });
+
+            chartInstances[canvasId] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: { font: { family: "'Inter', sans-serif" } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: { precision: 0, font: { family: "'Inter', sans-serif" } }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { family: "'Inter', sans-serif" },
+                                boxWidth: 12,
+                                padding: 10
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { family: "'Inter', sans-serif" },
+                            bodyFont: { family: "'Inter', sans-serif" },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.raw;
+                                    if (val === 0) return null; // Hide 0 values in stack from tooltip
+                                    
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    
+                                    const school = context.label;
+                                    const totalForSchool = schoolTotals[school];
+                                    const percentage = totalForSchool > 0 ? ((val / totalForSchool) * 100).toFixed(1) + '%' : '0%';
+                                    
+                                    return `${label}${val} (${percentage})`;
                                 }
                             }
                         }
                     }
                 }
             });
-
-            /* --- Chart 2: Activity by School (Stacked Bar) --- */
-            // Extract top schools (or all if few)
-            let schoolsArray = Object.keys(stats.schools).map(name => {
-                return {
-                    name: name,
-                    ...stats.schools[name],
-                    totalForSchool: stats.schools[name].assembly + stats.schools[name].values + stats.schools[name].visits + stats.schools[name].followUp
-                };
-            });
-            
-            // Sort by most active schools
-            schoolsArray.sort((a, b) => b.totalForSchool - a.totalForSchool);
-            
-            // Optional: Limit to top 15 schools to keep chart readable
-            const topSchools = schoolsArray.slice(0, 15);
-
-            const schoolLabels = topSchools.map(s => s.name);
-            const dataAssembly = topSchools.map(s => s.assembly);
-            const dataValues = topSchools.map(s => s.values);
-            const dataVisits = topSchools.map(s => s.visits);
-            const dataFollowup = topSchools.map(s => s.followUp);
-
-            const schoolCtx = document.getElementById('schoolChart').getContext('2d');
-            if (schoolChartInstance) schoolChartInstance.destroy();
-
-            schoolChartInstance = new Chart(schoolCtx, {
-                type: 'bar',
-                data: {
-                    labels: schoolLabels.length > 0 ? schoolLabels : ['No data yet'],
-                    datasets: [
-                        { label: 'Assemblies', data: dataAssembly, backgroundColor: '#3b82f6', borderRadius: 4 },
-                        { label: 'Values', data: dataValues, backgroundColor: '#10b981', borderRadius: 4 },
-                        { label: 'Visits', data: dataVisits, backgroundColor: '#8b5cf6', borderRadius: 4 },
-                        { label: 'Follow-Ups', data: dataFollowup, backgroundColor: '#f59e0b', borderRadius: 4 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { stacked: true, grid: { display: false } },
-                        y: { stacked: true, border: { display: false } }
-                    },
-                    plugins: {
-                        legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } }
-                    }
-                }
-            });
-
-            /* --- Chart 3: Activity by Residents --- */
-            const residentLabels = Object.keys(stats.residents);
-            const residentAssembly = residentLabels.map(r => stats.residents[r].assembly);
-            const residentValues = residentLabels.map(r => stats.residents[r].values);
-            
-            const residentCtx = document.getElementById('residentChart').getContext('2d');
-            if (residentChartInstance) residentChartInstance.destroy();
-            residentChartInstance = new Chart(residentCtx, {
-                type: 'bar',
-                data: {
-                    labels: residentLabels.length > 0 ? residentLabels : ['No data'],
-                    datasets: [
-                        { label: 'Assemblies', data: residentAssembly, backgroundColor: '#3b82f6', borderRadius: 4 },
-                        { label: 'Values', data: residentValues, backgroundColor: '#10b981', borderRadius: 4 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: {display: false} }, y: { stacked: true, border: {display: false} } }, plugins: { legend: { position: 'top', labels: {usePointStyle: true, boxWidth: 8} } } }
-            });
-
-            /* --- Chart 4: Activity by Principals --- */
-            const principalLabels = Object.keys(stats.principals);
-            const principalVisits = principalLabels.map(p => stats.principals[p].visits);
-
-            const principalCtx = document.getElementById('principalChart').getContext('2d');
-            if (principalChartInstance) principalChartInstance.destroy();
-            principalChartInstance = new Chart(principalCtx, {
-                type: 'bar',
-                data: {
-                    labels: principalLabels.length > 0 ? principalLabels : ['No data'],
-                    datasets: [{ label: 'Visits', data: principalVisits, backgroundColor: '#8b5cf6', borderRadius: 4 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: {display: false} }, y: { border: {display: false} } }, plugins: { legend: { position: 'top', labels: {usePointStyle: true, boxWidth: 8} } } }
-            });
-
-            /* --- Chart 5: Activity by Priests --- */
-            const priestLabels = Object.keys(stats.priests);
-            const priestFollowUps = priestLabels.map(p => stats.priests[p].followUp);
-
-            const priestCtx = document.getElementById('priestChart').getContext('2d');
-            if (priestChartInstance) priestChartInstance.destroy();
-            priestChartInstance = new Chart(priestCtx, {
-                type: 'bar',
-                data: {
-                    labels: priestLabels.length > 0 ? priestLabels : ['No data'],
-                    datasets: [{ label: 'Follow-Ups', data: priestFollowUps, backgroundColor: '#f59e0b', borderRadius: 4 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: {display: false} }, y: { border: {display: false} } }, plugins: { legend: { position: 'top', labels: {usePointStyle: true, boxWidth: 8} } } }
-            });
         }
 
-        // Run on load
-        document.addEventListener('DOMContentLoaded', initDashboard);
+        // Refresh Button Event Listener
+        document.getElementById('refresh-btn').addEventListener('click', () => {
+            // Hide dashboard, show loading animation
+            document.getElementById('dashboard-grid').classList.add('hidden');
+            document.getElementById('summary-stats').classList.add('hidden');
+            document.getElementById('refresh-btn').classList.add('hidden');
+            document.getElementById('dashboard-title').classList.add('opacity-0');
+            document.getElementById('loading-state').style.display = 'flex';
+            
+            // Fetch fresh data
+            initializeDashboard();
+        });
 
+        // Start everything when the page loads
+        window.addEventListener('DOMContentLoaded', initializeDashboard);
     </script>
 </body>
 </html>
